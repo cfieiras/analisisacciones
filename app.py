@@ -6,12 +6,19 @@ st.set_page_config(page_title="Análisis de Acciones", layout="wide")
 st.title("Analizador de Acciones: Técnico y Fundamental")
 
 st.sidebar.header("Configuración")
-ticker = st.sidebar.text_input("Símbolo de la acción", value="AAPL")
+
+tickers_input = st.sidebar.text_area("Símbolos de las acciones (separados por coma)", value="AAPL, QQQ, SPY")
+
+tickers = [t.strip().upper() for t in tickers_input.split(",") if t.strip()]
 
 if st.sidebar.button("Analizar"):
-    st.write(f"## Resultados para {ticker}")
-    tech_data = get_technical_analysis(ticker)
-    fund_data = get_fundamental_analysis(ticker)
+    if tickers:
+        symbol = tickers[0]
+        st.write(f"## Resultados para {symbol}")
+        tech_data = get_technical_analysis(symbol)
+        fund_data = get_fundamental_analysis(symbol)
+    else:
+        st.warning("No se ingresó ningún símbolo.")
 
     # --- Lógica de Recomendación ---
     if tech_data is not None and not tech_data.empty and fund_data is not None:
@@ -102,3 +109,34 @@ if st.sidebar.button("Analizar"):
         st.write(f"**Recomendación:** {fund_data.get('recommendationKey','N/A')}")
     else:
         st.warning("No se pudo obtener análisis fundamental.")
+
+# --- Análisis Simple para múltiples acciones ---
+if st.sidebar.button("Análisis Simple"):
+    st.write("# Análisis Simple de Múltiples Acciones")
+    resumen = []
+    for symbol in tickers:
+        st.write(f"## {symbol}")
+        tech_data = get_technical_analysis(symbol)
+        fund_data = get_fundamental_analysis(symbol)
+        if tech_data is not None and not tech_data.empty and fund_data is not None:
+            latest = tech_data.iloc[-1]
+            current_price = float(latest['Close'])
+            sma_50 = float(latest['SMA_50'])
+            sma_200 = float(latest['SMA_200'])
+            rsi = float(latest['RSI'])
+            recommendation = "Mantener"
+            if current_price > sma_50 and current_price > sma_200:
+                recommendation = "Comprar"
+            elif current_price < sma_50 and current_price < sma_200:
+                recommendation = "Vender"
+            if rsi < 30 and recommendation != "Vender":
+                recommendation = "Comprar"
+            elif rsi > 70 and recommendation != "Comprar":
+                recommendation = "Vender"
+            st.write(f"**Recomendación:** {recommendation}")
+            resumen.append((symbol, recommendation))
+        else:
+            st.write("No se pudo obtener análisis para este símbolo.")
+    st.write("## Resumen de Recomendaciones")
+    for symbol, rec in resumen:
+        st.write(f"- {symbol}: {rec}")
