@@ -7,52 +7,6 @@ st.title("Analizador de Acciones: Técnico y Fundamental")
 
 st.sidebar.header("Configuración")
 
-# Cuadro para Hugging Face Token
-st.sidebar.markdown("---")
-hf_token = st.sidebar.text_input("Token de Hugging Face", type="password")
-
-# Cuadro de preguntas con Hugging Face
-user_question_hf = st.sidebar.text_area("Pregunta para IA (Hugging Face)", value="¿YPF.BA bajará de los 42000 próximamente?")
-if st.sidebar.button("Preguntar a Hugging Face"):
-    import requests
-    import re
-    st.write("# Respuesta de IA (Hugging Face)")
-    # Extraer símbolo de la pregunta
-    match = re.search(r"([A-Z\.]+)", user_question_hf)
-    symbol = match.group(1) if match else None
-    if symbol:
-        tech_data = get_technical_analysis(symbol)
-        fund_data = get_fundamental_analysis(symbol)
-        if tech_data is not None and not tech_data.empty and fund_data is not None:
-            latest = tech_data.iloc[-1]
-            # Resumen técnico y fundamental
-            resumen = f"Precio actual: {float(latest['Close']):.2f}\nRSI: {float(latest['RSI']):.2f}\nSMA_50: {float(latest['SMA_50']):.2f}\nSMA_200: {float(latest['SMA_200']):.2f}\nMACD: {float(latest['MACD']):.2f}\nSector: {fund_data.get('sector','N/A')}\nIndustria: {fund_data.get('industry','N/A')}\nP/E Forward: {fund_data.get('forwardPE','N/A')}\nCrecimiento de Ganancias: {fund_data.get('earningsGrowth','N/A')}\nCrecimiento de Ingresos: {fund_data.get('revenueGrowth','N/A')}"
-            prompt = f"Datos de la acción {symbol}:\n{resumen}\n\nPregunta del usuario: {user_question_hf}\nResponde de forma clara y breve para inversores argentinos."
-            if hf_token:
-                # Hugging Face Inference API endpoint (Mistral-7B-Instruct)
-                url = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
-                headers = {"Authorization": f"Bearer {hf_token}", "Content-Type": "application/json"}
-                payload = {"inputs": prompt}
-                try:
-                    response = requests.post(url, headers=headers, json=payload, timeout=60)
-                    if response.status_code == 200:
-                        result = response.json()
-                        # La respuesta puede estar en 'generated_text' o en la lista
-                        if isinstance(result, list) and 'generated_text' in result[0]:
-                            answer = result[0]['generated_text']
-                        else:
-                            answer = result
-                        st.write(answer)
-                    else:
-                        st.error(f"Error de Hugging Face: {response.status_code} - {response.text}")
-                except Exception as e:
-                    st.error(f"Error al conectar con Hugging Face: {e}")
-            else:
-                st.warning("Por favor, ingresa tu token de Hugging Face.")
-        else:
-            st.warning(f"No se encontraron datos para el símbolo {symbol}.")
-    else:
-        st.warning("No se pudo interpretar el símbolo en la pregunta.")
 
 # Cuadro de preguntas personalizadas
 st.sidebar.markdown("---")
