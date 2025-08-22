@@ -6,6 +6,89 @@ st.set_page_config(page_title="Análisis de Acciones", layout="wide")
 st.title("Analizador de Acciones: Técnico y Fundamental")
 
 st.sidebar.header("Configuración")
+# Cuadro para API Key de DeepSeek
+st.sidebar.markdown("---")
+deepseek_api_key = st.sidebar.text_input("API Key de DeepSeek", type="password")
+
+# Cuadro de preguntas con DeepSeek
+user_question_deepseek = st.sidebar.text_area("Pregunta para IA (DeepSeek)", value="¿YPF.BA bajará de los 42000 próximamente?")
+if st.sidebar.button("Preguntar a DeepSeek"):
+    import requests
+    import re
+    st.write("# Respuesta de IA (DeepSeek)")
+    # Extraer símbolo de la pregunta
+    match = re.search(r"([A-Z\.]+)", user_question_deepseek)
+    symbol = match.group(1) if match else None
+    if symbol:
+        tech_data = get_technical_analysis(symbol)
+        fund_data = get_fundamental_analysis(symbol)
+        if tech_data is not None and not tech_data.empty and fund_data is not None:
+            latest = tech_data.iloc[-1]
+            # Resumen técnico y fundamental
+            resumen = f"Precio actual: {float(latest['Close']):.2f}\nRSI: {float(latest['RSI']):.2f}\nSMA_50: {float(latest['SMA_50']):.2f}\nSMA_200: {float(latest['SMA_200']):.2f}\nMACD: {float(latest['MACD']):.2f}\nSector: {fund_data.get('sector','N/A')}\nIndustria: {fund_data.get('industry','N/A')}\nP/E Forward: {fund_data.get('forwardPE','N/A')}\nCrecimiento de Ganancias: {fund_data.get('earningsGrowth','N/A')}\nCrecimiento de Ingresos: {fund_data.get('revenueGrowth','N/A')}"
+            prompt = f"Datos de la acción {symbol}:\n{resumen}\n\nPregunta del usuario: {user_question_deepseek}\nResponde de forma clara y breve para inversores argentinos."
+            if deepseek_api_key:
+                # DeepSeek API endpoint (ajusta si tienes otro endpoint)
+                url = "https://api.deepseek.com/v1/chat/completions"
+                headers = {"Authorization": f"Bearer {deepseek_api_key}", "Content-Type": "application/json"}
+                payload = {
+                    "model": "deepseek-chat",
+                    "messages": [
+                        {"role": "system", "content": "Eres un analista financiero argentino."},
+                        {"role": "user", "content": prompt}
+                    ]
+                }
+                try:
+                    response = requests.post(url, headers=headers, json=payload, timeout=30)
+                    if response.status_code == 200:
+                        result = response.json()
+                        answer = result['choices'][0]['message']['content'] if 'choices' in result and result['choices'] else result
+                        st.write(answer)
+                    else:
+                        st.error(f"Error de DeepSeek: {response.status_code} - {response.text}")
+                except Exception as e:
+                    st.error(f"Error al conectar con DeepSeek: {e}")
+            else:
+                st.warning("Por favor, ingresa tu API Key de DeepSeek.")
+        else:
+            st.warning(f"No se encontraron datos para el símbolo {symbol}.")
+    else:
+        st.warning("No se pudo interpretar el símbolo en la pregunta.")
+
+# Cuadro de preguntas personalizadas
+st.sidebar.markdown("---")
+user_question = st.sidebar.text_input("Pregunta sobre una acción (ej: 'YPF.BA bajará de los 42.000 próximamente?')")
+if st.sidebar.button("Preguntar"):
+    import re
+    st.write("# Respuesta a tu pregunta")
+    # Extraer símbolo y precio objetivo de la pregunta
+    match = re.search(r"([A-Z\.]+).*?(\d+[\.,]?\d*)", user_question)
+    if match:
+        symbol = match.group(1)
+        price_str = match.group(2).replace(",", ".")
+        try:
+            price_target = float(price_str)
+        except:
+            price_target = None
+        tech_data = get_technical_analysis(symbol)
+        if tech_data is not None and not tech_data.empty:
+            latest = tech_data.iloc[-1]
+            current_price = float(latest['Close'])
+            st.write(f"Precio actual de {symbol}: {current_price:.2f}")
+            if price_target is not None:
+                if current_price < price_target:
+                    st.write(f"Actualmente está por debajo de {price_target}.")
+                elif current_price > price_target:
+                    st.write(f"Actualmente está por encima de {price_target}.")
+                else:
+                    st.write(f"Actualmente está en {price_target}.")
+                st.write("No se puede predecir con certeza si bajará o subirá, pero puedes revisar la tendencia y los indicadores técnicos para tomar una decisión informada.")
+            else:
+                st.write("No se pudo extraer el precio objetivo de la pregunta.")
+        else:
+            st.write(f"No se encontraron datos para el símbolo {symbol}.")
+    else:
+        st.write("No se pudo interpretar la pregunta. Por favor, usa el formato 'TICKER bajará/subirá de X próximamente?'")
 
 tickers_input = st.sidebar.text_area("Símbolos de las acciones (separados por coma)", value="AAPL, QQQ, SPY")
 
