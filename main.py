@@ -110,4 +110,5 @@ def run_analysis():
     print("Esta recomendación es generada por un algoritmo simple y no debe considerarse como asesoramiento financiero profesional. Realice siempre su propia investigación y consulte a un experto antes de tomar decisiones de inversión.")
 
 if __name__ == "__main__":
-    run_analysis()
+    import os
+    os.system("streamlit run app.py")
