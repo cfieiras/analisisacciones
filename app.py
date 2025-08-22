@@ -1,0 +1,104 @@
+import streamlit as st
+from analisis_tecnico import get_technical_analysis
+from analisis_fundamental import get_fundamental_analysis
+
+st.set_page_config(page_title="Análisis de Acciones", layout="wide")
+st.title("Analizador de Acciones: Técnico y Fundamental")
+
+st.sidebar.header("Configuración")
+ticker = st.sidebar.text_input("Símbolo de la acción", value="AAPL")
+
+if st.sidebar.button("Analizar"):
+    st.write(f"## Resultados para {ticker}")
+    tech_data = get_technical_analysis(ticker)
+    fund_data = get_fundamental_analysis(ticker)
+
+    # --- Lógica de Recomendación ---
+    if tech_data is not None and not tech_data.empty and fund_data is not None:
+        latest = tech_data.iloc[-1]
+        current_price = float(latest['Close'])
+        sma_50 = float(latest['SMA_50'])
+        sma_200 = float(latest['SMA_200'])
+        rsi = float(latest['RSI'])
+        recommendation = "Mantener"
+        reasons = []
+        if current_price > sma_50 and current_price > sma_200:
+            recommendation = "Comprar"
+            reasons.append("El precio actual está por encima de las SMAs de 50 y 200 días (tendencia alcista).")
+        elif current_price < sma_50 and current_price < sma_200:
+            recommendation = "Vender"
+            reasons.append("El precio actual está por debajo de las SMAs de 50 y 200 días (tendencia bajista).")
+        if rsi < 30:
+            if recommendation == "Comprar":
+                reasons.append("El RSI indica que la acción podría estar sobrevendida, lo que refuerza la señal de compra.")
+            elif recommendation == "Mantener":
+                recommendation = "Comprar"
+                reasons.append("El RSI indica que la acción podría estar sobrevendida.")
+        elif rsi > 70:
+            if recommendation == "Vender":
+                reasons.append("El RSI indica que la acción podría estar sobrecomprada, lo que refuerza la señal de venta.")
+            elif recommendation == "Mantener":
+                recommendation = "Vender"
+                reasons.append("El RSI indica que la acción podría estar sobrecomprada.")
+        if isinstance(fund_data.get('earningsGrowth'), (int, float)) and fund_data['earningsGrowth'] > 0.10:
+            if recommendation == "Vender":
+                recommendation = "Mantener"
+                reasons.append("A pesar de las señales técnicas, el crecimiento de ganancias es positivo.")
+            elif recommendation == "Mantener":
+                reasons.append("El crecimiento de ganancias es sólido.")
+            elif recommendation == "Comprar":
+                reasons.append("El crecimiento de ganancias es sólido, lo que apoya la compra.")
+        if isinstance(fund_data.get('forwardPE'), (int, float)) and fund_data['forwardPE'] > 0 and fund_data['forwardPE'] < 25:
+            if recommendation == "Comprar":
+                reasons.append("El P/E forward es razonable.")
+            elif recommendation == "Mantener":
+                reasons.append("El P/E forward es razonable.")
+        st.subheader("Recomendación Final")
+        st.write(f"**Recomendación:** {recommendation}")
+        st.write("**Explicación detallada:**")
+        if recommendation == "Comprar":
+            st.write("Se recomienda comprar porque:")
+        elif recommendation == "Vender":
+            st.write("Se recomienda vender porque:")
+        else:
+            st.write("Se recomienda mantener porque:")
+        if reasons:
+            for reason in reasons:
+                st.write(f"- {reason}")
+        else:
+            st.write("No hay razones específicas adicionales para la recomendación actual.")
+
+    if tech_data is not None and not tech_data.empty:
+        latest = tech_data.iloc[-1]
+        st.subheader("Análisis Técnico")
+        st.metric("Precio Actual", f"{float(latest['Close']):.2f}")
+        st.metric("RSI (14 días)", f"{float(latest['RSI']):.2f}")
+        st.metric("SMA 50", f"{float(latest['SMA_50']):.2f}")
+        st.metric("SMA 200", f"{float(latest['SMA_200']):.2f}")
+        st.metric("MACD", f"{float(latest['MACD']):.2f}")
+        st.metric("Bollinger High", f"{float(latest['BB_high']):.2f}")
+        st.metric("Bollinger Low", f"{float(latest['BB_low']):.2f}")
+        import pandas as pd
+        # Aplanar columnas MultiIndex si existen
+        if isinstance(tech_data.columns, pd.MultiIndex):
+            tech_data.columns = ['_'.join([str(i) for i in col if i]) for col in tech_data.columns]
+
+        cols = [col for col in tech_data.columns if any(x in col for x in ['Close','SMA_50','SMA_200','BB_high','BB_low'])]
+        df_plot = tech_data.reset_index()[cols]
+        st.line_chart(df_plot)
+    else:
+        st.warning("No se pudo obtener análisis técnico.")
+
+    if fund_data is not None:
+        st.subheader("Análisis Fundamental")
+        st.write(f"**Sector:** {fund_data.get('sector','N/A')}")
+        st.write(f"**Industria:** {fund_data.get('industry','N/A')}")
+        st.write(f"**P/E Forward:** {fund_data.get('forwardPE','N/A')}")
+        st.write(f"**Market Cap:** {fund_data.get('marketCap','N/A'):,}")
+        st.write(f"**Crecimiento de Ganancias:** {fund_data.get('earningsGrowth','N/A')}")
+        st.write(f"**Crecimiento de Ingresos:** {fund_data.get('revenueGrowth','N/A')}")
+        st.write(f"**EBITDA:** {fund_data.get('ebitda','N/A')}")
+        st.write(f"**Dividend Yield:** {fund_data.get('dividendYield','N/A')}")
+        st.write(f"**Recomendación:** {fund_data.get('recommendationKey','N/A')}")
+    else:
+        st.warning("No se pudo obtener análisis fundamental.")
